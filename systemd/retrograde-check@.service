@@ -1,0 +1,6 @@
+[Unit]
+Description=Retrograde Orbit Submission Checker
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/gemini/server/venv/bin/retrograde-admin %i check-submissions

@@ -1,0 +1,8 @@
+[Unit]
+Description=Retrograde Orbit Submission Watcher
+
+[Path]
+PathExists=%h/.local/state/retrograde/%i/submissions.json
+
+[Install]
+WantedBy=default.target
