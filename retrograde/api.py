@@ -11,6 +11,11 @@ def render_dashboard(orbit_dir, url):
     escaped_url = quote(url, safe="")
     orbit = db.read_orbit(orbit_dir)
     is_member = url in orbit
+    check_log = db.read_check_log(orbit_dir, url)
+    if check_log is None:
+        log_message = "No membership check log found. Submit page for membership check!"
+    else:
+        log_message = check_log.message
     return f"""# {settings.name} - Page Dashboard
 Status: {"IN ORBIT" if is_member else "NOT IN ORBIT"}
 
@@ -18,6 +23,10 @@ Status: {"IN ORBIT" if is_member else "NOT IN ORBIT"}
 => {settings.base_url}dashboard?{escaped_url} Reload this dashboard
 => {settings.base_url}submit?{escaped_url} Submit page for a membership check
 => {settings.base_url} Back to orbit main page
+
+```Membership Check Log
+{log_message}
+```
 
 ## How to join
 

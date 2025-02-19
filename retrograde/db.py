@@ -1,3 +1,4 @@
+from base64 import standard_b64encode
 from collections import namedtuple
 from hashlib import sha256
 import json
@@ -9,6 +10,8 @@ import gemurl
 
 
 Settings = namedtuple("Settings", "name, base_url")
+
+CheckLog = namedtuple("CheckLog", "timestamp, is_valid, was_valid, message")
 
 
 def get_orbit_dir(orbit_id, check_exists=True):
@@ -103,3 +106,21 @@ def _write_list(path, list_):
             json.dump(list_, f, indent=4, sort_keys=True)
     else:
         path.unlink(missing_ok=True)
+
+
+def write_check_log(orbit_dir, url, log):
+    url_base64 = standard_b64encode(url.encode("utf-8")).decode("us-ascii")
+    path = Path(orbit_dir) / "check_logs" / f"{url_base64}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(log._asdict(), f, indent=4, sort_keys=True)
+
+
+def read_check_log(orbit_dir, url):
+    url_base64 = standard_b64encode(url.encode("utf-8")).decode("us-ascii")
+    path = Path(orbit_dir) / "check_logs" / f"{url_base64}.json"
+    if path.exists():
+        with path.open("r", encoding="utf-8") as f:
+            return CheckLog(**json.load(f))
+    else:
+        return None

@@ -1,4 +1,5 @@
 import argparse
+from datetime import datetime, timezone
 import re
 import sys
 from urllib.parse import quote
@@ -24,6 +25,8 @@ def main():
     subparsers.add_parser("list", help="List URLs in orbit")
     check_parser = subparsers.add_parser("check", help="Check given URL for orbit links and update its membership")
     check_parser.add_argument("url", help="Page URL for orbit candidate")
+    check_log_parser = subparsers.add_parser("check-log", help="Displays the membership check log for the given URL")
+    check_log_parser.add_argument("url", help="Page URL for orbit candidate")
     subparsers.add_parser("check-submissions", help="Check submitted URLs")
     args = parser.parse_args()
     if args.command == "dir":
@@ -36,6 +39,12 @@ def main():
             print(url)
     elif args.command == "check":
         check_url(db.get_orbit_dir(args.orbit_id), args.url, print_summary=True)
+    elif args.command == "check-log":
+        check_log = db.read_check_log(db.get_orbit_dir(args.orbit_id), args.url)
+        if check_log is None:
+            print("No check log found.")
+        else:
+            print(check_log.message, end=None)
     elif args.command == "check-submissions":
         orbit_dir = db.get_orbit_dir(args.orbit_id)
         while True:
@@ -49,15 +58,32 @@ def main():
         sys.exit(1)
 
 
+_VERDICTS = {
+    (False, False): "Remains out of orbit",
+    (False, True): "Added to orbit",
+    (True, False): "Removed from orbit",
+    (True, True): "Remains in orbit",
+}
+
+
 def check_url(orbit_dir, url, print_summary=False):
+    dt = datetime.now(timezone.utc)
+    timestamp = int(dt.timestamp())
     url = gemurl.normalize_url(url)
     escaped_url = quote(url, safe="")
     settings = db.read_settings(orbit_dir)
-    required_links_left = {
+    required_links = {
         settings.base_url,
         f"{settings.base_url}next?{escaped_url}",
         f"{settings.base_url}prev?{escaped_url}",
     }
+    optional_links = {
+        f"{settings.base_url}random?{escaped_url}",
+    }
+    remaining_required_links = set(required_links)
+    remaining_optional_links = set(optional_links)
+    found_links = []
+    response = None
     try:
         response = gemcall.request(url)
         while True:
@@ -65,29 +91,48 @@ def check_url(orbit_dir, url, print_summary=False):
             if not line:
                 break
             line = line.decode("utf-8", errors="replace")
-            m = re.match(r"=>\s+(?P<url>\S+)", line)
+            m = re.match(r"=>\s?(?P<url>\S+)", line)
             if not m:
                 continue
             link_url = m.group("url")
+            found_links.append(link_url)
             # TODO: resolve relative URLs (and normalize them) here
-            if link_url in required_links_left:
-                required_links_left.remove(link_url)
+            if link_url in remaining_required_links:
+                remaining_required_links.remove(link_url)
+            if link_url in remaining_optional_links:
+                remaining_optional_links.remove(link_url)
     except Exception:
         print(traceback.format_exc())
     finally:
-        response.discard()
-    is_valid = not required_links_left
+        if response:
+            response.discard()
+    is_valid = not remaining_required_links
     was_valid = db.update_url_membership(orbit_dir, url, is_valid)
+    verdict = _VERDICTS[(was_valid, is_valid)]
+    message = f"Timestamp: {dt}\n"
+    message += f"Result: {verdict}\n\n"
+    message += "Required navigation links:\n"
+    for required_link in sorted(required_links):
+        if required_link in remaining_required_links:
+            message += f"* [MISSING] {required_link}\n"
+        else:
+            message += f"* [FOUND]   {required_link}\n"
+    message += "\n"
+    message += "Optional navigation links:\n"
+    for optional_link in sorted(optional_links):
+        if optional_link in remaining_optional_links:
+            message += f"* [MISSING] {optional_link}\n"
+        else:
+            message += f"* [FOUND]   {optional_link}\n"
+    message += "\n"
+    if remaining_required_links:
+        message += "Other links found on page:\n"
+        for found_link in found_links:
+            if found_link not in required_links and found_link not in optional_links:
+                message += f"* {found_link}\n"
+        message += "\n"
+    check_log = db.CheckLog(timestamp, is_valid, was_valid, message)
+    db.write_check_log(orbit_dir, url, check_log)
     if print_summary:
-        messages = {
-            (False, False): "Remains out of orbit",
-            (False, True): "Added to orbit",
-            (True, False): "Removed from orbit",
-            (True, True): "Remains in orbit",
-        }
-        print(messages[(was_valid, is_valid)])
-        if required_links_left:
-            print("Missing links:")
-            for link in sorted(required_links_left):
-                print(link)
+        print(message, end=None)
     return was_valid, is_valid
