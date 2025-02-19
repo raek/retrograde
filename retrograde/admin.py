@@ -2,6 +2,7 @@ import argparse
 import re
 import sys
 from urllib.parse import quote
+import traceback
 
 import gemcall
 import gemurl
@@ -72,7 +73,7 @@ def check_url(orbit_dir, url, print_summary=False):
             if link_url in required_links_left:
                 required_links_left.remove(link_url)
     except Exception:
-        pass
+        print(traceback.format_exc())
     finally:
         response.discard()
     is_valid = not required_links_left

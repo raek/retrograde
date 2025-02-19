@@ -10,9 +10,12 @@ def install_orbit_routes(app, orbit_id, mount_prefix):
 
     @app.route(mount_prefix + "/dashboard")
     def dashboard(request):
-        if not request.query:
+        url = request.query
+        if not url:
             return Response(Status.INPUT, "Page URL")
-        url = gemurl.normalize_url(request.query)
+        if not url.startswith("gemini://"):
+            url = "gemini://" + url
+        url = gemurl.normalize_url(url)
         return Response(Status.SUCCESS, "text/gemini", api.render_dashboard(orbit_dir, url))
 
     @app.route(mount_prefix + "/next")
