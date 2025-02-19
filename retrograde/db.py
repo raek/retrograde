@@ -44,7 +44,7 @@ def extend_orbit(orbit, url):
 
 def _key_fn(url):
     # Alphabetic order is boring. Let's do someting more interesing.
-    return sha256(gemurl.capsule_prefix(url).encode("us-ascii")).digest(), url
+    return sha256(gemurl.capsule_prefix(url).encode("utf-8")).digest(), url
 
 
 def read_orbit(orbit_dir):
