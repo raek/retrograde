@@ -2,7 +2,7 @@ import gemurl
 from jetforce import Response, Status
 
 import retrograde.api as api
-from retrograde.db import get_orbit_dir, read_settings
+from retrograde.db import get_orbit_dir, read_settings, angle
 
 
 def install_orbit_routes(app, orbit_id, mount_prefix):
@@ -48,7 +48,7 @@ def install_orbit_routes(app, orbit_id, mount_prefix):
         body = f"# {settings.name}\n"
         body += "\n"
         for url in urls:
-            body += f"=> {url}\n"
+            body += f"=> {url} {angle(url):3}° – {url}\n"
         return Response(Status.SUCCESS, "text/gemini", body)
 
     @app.route(mount_prefix + "/submit")

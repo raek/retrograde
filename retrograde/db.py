@@ -45,6 +45,12 @@ def extend_orbit(orbit, url):
     return new_orbit
 
 
+def angle(url):
+    hash_sum = sha256(gemurl.capsule_prefix(url).encode("utf-8")).digest()
+    u16 = int.from_bytes(hash_sum[0:2], byteorder="big")
+    return (u16 * 360) // (2**16)
+
+
 def _key_fn(url):
     # Alphabetic order is boring. Let's do someting more interesing.
     return sha256(gemurl.capsule_prefix(url).encode("utf-8")).digest(), url
